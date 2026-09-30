@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Control Remoto Global (MQTT)</title>
+  <!-- Cliente MQTT via WebSockets para el navegador -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: var(--card);
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      width: 100%;
+      max-width: 380px;
+      text-align: center;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--accent); }
+    p.subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .status-box {
+      background: rgba(255,255,255,0.05);
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+    .badge.off { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .badge.on { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .footer { font-size: 0.75rem; color: var(--text-muted); margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>ESP32 Control Global</h1>
+    <p class="subtitle">Conexión MQTT Nube</p>
+    
+    <div class="status-box">
+      <span>Estado Dispositivo</span>
+      <span id="led-badge" class="badge off">DESCONECTADO</span>
+    </div>
+
+    <button class="btn" onclick="toggleLED()">Cambiar Estado</button>
+
+    <div class="footer">Acceso desde cualquier red móvil/Wi-Fi</div>
+  </div>
+
+  <script>
+    // Conexión al Broker MQTT mediante WebSockets
+    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+    
+    // Tópicos únicos (Puedes cambiar 'mi_esp32_unico' por cualquier palabra clave)
+    const topicCmd = 'esp32_red_direct/led/cmd';
+    const topicStatus = 'esp32_red_direct/led/status';
+
+    let currentLedState = "0";
+
+    client.on('connect', () => {
+      console.log('Conectado al servidor MQTT');
+      client.subscribe(topicStatus);
+    });
+
+    client.on('message', (topic, message) => {
+      if (topic === topicStatus) {
+        currentLedState = message.toString();
+        const badge = document.getElementById('led-badge');
+        if (currentLedState === '1') {
+          badge.innerText = 'ENCENDIDO';
+          badge.className = 'badge on';
+        } else {
+          badge.innerText = 'APAGADO';
+          badge.className = 'badge off';
+        }
+      }
+    });
+
+    function toggleLED() {
+      const newState = currentLedState === '1' ? '0' : '1';
+      client.publish(topicCmd, newState);
+    }
+  </script>
+</body>
+</html>
