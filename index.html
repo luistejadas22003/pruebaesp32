@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 Control Remoto Global (MQTT)</title>
-  <!-- Cliente MQTT via WebSockets para el navegador -->
+  <title>ESPDuino-32 Control Global</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     :root {
@@ -29,6 +28,7 @@
       padding: 20px;
     }
     .card {
+      position: relative; /* Para posicionar el círculo en la esquina */
       background: var(--card);
       padding: 2rem;
       border-radius: 16px;
@@ -37,6 +37,24 @@
       max-width: 380px;
       text-align: center;
     }
+
+    /* Indicador circular de estado de conexión en la esquina superior derecha */
+    .connection-status {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: var(--danger); /* Inicia en rojo por defecto */
+      box-shadow: 0 0 8px var(--danger);
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+    .connection-status.online {
+      background-color: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--accent); }
     p.subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
     .status-box {
@@ -74,36 +92,46 @@
 </head>
 <body>
   <div class="card">
-    <h1>ESP32 Control Global</h1>
-    <p class="subtitle">Conexión MQTT Nube</p>
+    <!-- Círculo de estado en la esquina superior derecha -->
+    <div id="status-indicator" class="connection-status" title="Estado de la ESP32"></div>
+
+    <h1>ESPDuino-32</h1>
+    <p class="subtitle">Control Global MQTT</p>
     
     <div class="status-box">
-      <span>Estado Dispositivo</span>
-      <span id="led-badge" class="badge off">DESCONECTADO</span>
+      <span>Estado LED (IO2)</span>
+      <span id="led-badge" class="badge off">APAGADO</span>
     </div>
 
     <button class="btn" onclick="toggleLED()">Cambiar Estado</button>
 
-    <div class="footer">Acceso desde cualquier red móvil/Wi-Fi</div>
+    <div class="footer" id="log-info">Esperando conexión de la ESP32...</div>
   </div>
 
   <script>
-    // Conexión al Broker MQTT mediante WebSockets
-    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
-    
-    // Tópicos únicos (Puedes cambiar 'mi_esp32_unico' por cualquier palabra clave)
     const topicCmd = 'esp32_red_direct/led/cmd';
     const topicStatus = 'esp32_red_direct/led/status';
+
+    // Conexión WSS requerida para GitHub Pages
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
     let currentLedState = "0";
 
     client.on('connect', () => {
-      console.log('Conectado al servidor MQTT');
       client.subscribe(topicStatus);
     });
 
+    client.on('error', (err) => {
+      setESP32Connected(false);
+      console.error(err);
+    });
+
+    // Recibir mensajes desde la ESP32
     client.on('message', (topic, message) => {
       if (topic === topicStatus) {
+        // Al recibir cualquier reporte de estado de la ESP32, activamos el círculo verde
+        setESP32Connected(true);
+
         currentLedState = message.toString();
         const badge = document.getElementById('led-badge');
         if (currentLedState === '1') {
@@ -115,6 +143,20 @@
         }
       }
     });
+
+    // Función para cambiar el color del círculo en la esquina
+    function setESP32Connected(isConnected) {
+      const indicator = document.getElementById('status-indicator');
+      const logInfo = document.getElementById('log-info');
+
+      if (isConnected) {
+        indicator.classList.add('online');
+        logInfo.innerText = "ESP32 Vinculada y Conectada";
+      } else {
+        indicator.classList.remove('online');
+        logInfo.innerText = "ESP32 Desconectada";
+      }
+    }
 
     function toggleLED() {
       const newState = currentLedState === '1' ? '0' : '1';
